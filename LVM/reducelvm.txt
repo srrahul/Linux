@@ -1,0 +1,353 @@
+**************************REDUCE LVM********************************
+
+
+REDUCE LVM:
+***********
+
+unused space free can go to volume groupp so that we can use that space in somewhere 
+
+linux admin use it for storage and cost optimization
+
+
+mostly not recommended since it is an emergency
+
+before shrink/reduce we need to take "full backup" before which we are going to reduce the lvm
+
+
+and im going to take the vg_test-lv_test some space  and add it in another LVM vg_prod-lv_prod
+
+
+first unmount the mountpoint directory
+
+root@controlnode:/# umount /LVM2
+root@controlnode:/# df -hT
+Filesystem                  Type      Size  Used Avail Use% Mounted on
+/dev/root                   ext4      6.7G  3.4G  3.3G  51% /
+tmpfs                       tmpfs     3.8G     0  3.8G   0% /dev/shm
+tmpfs                       tmpfs     1.6G  1.2M  1.6G   1% /run
+efivarfs                    efivarfs  128K  3.3K  120K   3% /sys/firmware/efi/efivars
+tmpfs                       tmpfs     3.8G     0  3.8G   0% /tmp
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/systemd-journald.service
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/systemd-resolved.service
+/dev/nvme0n1p13             ext4      989M  167M  755M  19% /boot
+/dev/nvme0n1p15             vfat      105M  6.3M   99M   7% /boot/efi
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/systemd-networkd.service
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/getty@tty1.service
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/serial-getty@ttyS0.service
+tmpfs                       tmpfs     778M  8.0K  778M   1% /run/user/1000
+/dev/mapper/vg_prod-lv_prod ext4      9.6G  2.0M  9.1G   1% /LVM1
+root@controlnode:/#
+
+
+
+
+├─nvme2n1p3         259:7    0  3.5G  0 part
+│ └─vg_prod-lv_prod 252:0    0  9.8G  0 lvm  /LVM1
+├─nvme2n1p1         259:8    0    8G  0 part
+│ └─vg_prod-lv_prod 252:0    0  9.8G  0 lvm  /LVM1
+└─nvme2n1p2         259:10   0    8G  0 part
+  └─vg_test-lv_test 252:1    0  7.8G  0 lvm
+
+/LVM2 is not there so unmounted
+
+
+check fs before lvm reduce for checking inconsistency using e2fsck(works not EXT file system and not XFS as xfs fs we cannot reduce)
+
+
+root@controlnode:/# e2fsck -f /dev/vg_test/lv_test
+
+e2fsck 1.47.2 (1-Jan-2025)
+Pass 1: Checking inodes, blocks, and sizes
+Pass 2: Checking directory structure
+Pass 3: Checking directory connectivity
+Pass 4: Checking reference counts
+Pass 5: Checking group summary information
+/dev/vg_test/lv_test: 17/512064 files (0.0% non-contiguous), 58024/2044928 blocks
+
+
+all has been passed so we can proceed further.
+
+file system we need to resize fr that weneed to resize2fs
+
+
+root@controlnode:/# resize2fs /dev/vg_test/lv_test 1.8G
+resize2fs 1.47.2 (1-Jan-2025)
+resize2fs: Invalid new size: 1.8G
+
+root@controlnode:/# resize2fs /dev/vg_test/lv_test 2G
+resize2fs 1.47.2 (1-Jan-2025)
+Resizing the filesystem on /dev/vg_test/lv_test to 524288 (4k) blocks.
+The filesystem on /dev/vg_test/lv_test is now 524288 (4k) blocks long.
+
+
+now we need to reduce the same 2G size in /dev/vg_test/lv_test
+
+
+root@controlnode:/#  lvreduce -L 2G /dev/vg_test/lv_test
+  File system ext4 found on vg_test/lv_test.
+  File system size (2.00 GiB) is equal to the requested size (2.00 GiB).
+  File system reduce is not needed, skipping.
+  Size of logical volume vg_test/lv_test changed from 7.80 GiB (1997 extents) to 2.00 GiB (512 extents).
+  Logical volume vg_test/lv_test successfully resized.
+
+
+after reduce we need to mount
+
+
+root@controlnode:/# mount /dev/vg_test/lv_test /LVM2
+mount: (hint) your fstab has been modified, but systemd still uses
+       the old version; use 'systemctl daemon-reload' to reload.
+root@controlnode:/# systemctl daemon-reload
+
+
+
+root@controlnode:/# lsblk
+NAME                MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+loop0                 7:0    0 28.2M  1 loop /snap/amazon-ssm-agent/13009
+loop1                 7:1    0   74M  1 loop /snap/core22/2411
+loop2                 7:2    0 28.4M  1 loop /snap/amazon-ssm-agent/13349
+loop3                 7:3    0 49.3M  1 loop /snap/snapd/26865
+loop4                 7:4    0   74M  1 loop /snap/core22/2955
+loop5                 7:5    0 50.3M  1 loop /snap/snapd/27738
+nvme0n1             259:0    0    8G  0 disk
+├─nvme0n1p1         259:1    0  6.9G  0 part /
+├─nvme0n1p13        259:2    0 1023M  0 part /boot
+├─nvme0n1p14        259:3    0    4M  0 part
+└─nvme0n1p15        259:4    0  106M  0 part /boot/efi
+nvme1n1             259:5    0    2G  0 disk
+nvme2n1             259:6    0   20G  0 disk
+├─nvme2n1p3         259:7    0  3.5G  0 part
+│ └─vg_prod-lv_prod 252:0    0  9.8G  0 lvm  /LVM1
+├─nvme2n1p1         259:8    0    8G  0 part
+│ └─vg_prod-lv_prod 252:0    0  9.8G  0 lvm  /LVM1
+└─nvme2n1p2         259:10   0    8G  0 part
+  └─vg_test-lv_test 252:1    0    2G  0 lvm  /LVM2
+
+
+now vg_test-lv_test is changed to 2G
+
+
+now im going to create another lvm in nvme2n1p2 and vg_test volume group for the remaining space
+
+
+root@controlnode:/# lvcreate -n lv_testext -L 5.8G vg_test
+
+
+root@controlnode:/# mkfs.ext4 /dev/vg_test/lv_testext
+
+
+
+
+root@controlnode:/# lsblk -f
+NAME FSTYPE FSVER LABEL           UUID                                   FSAVAIL FSUSE% MOUNTPOINTS
+loop0
+     squash 4.0                                                                0   100% /snap/amazon-ssm-agent/13009
+loop1
+     squash 4.0                                                                0   100% /snap/core22/2411
+loop2
+     squash 4.0                                                                0   100% /snap/amazon-ssm-agent/13349
+loop3
+     squash 4.0                                                                0   100% /snap/snapd/26865
+loop4
+     squash 4.0                                                                0   100% /snap/core22/2955
+loop5
+     squash 4.0                                                                0   100% /snap/snapd/27738
+nvme0n1
+│                                                                               
+├─nvme0n1p1
+│    ext4   1.0   cloudimg-rootfs 553eb6f0-df3b-48cf-b8d3-48b8d7fe5b76      3.3G    50% /
+├─nvme0n1p13
+│    ext4   1.0   BOOT            005a5132-2768-402e-b8f5-1e31db26b1b6    754.9M    17% /boot
+├─nvme0n1p14
+│                                                                               
+└─nvme0n1p15
+     vfat   FAT32 UEFI            032C-9E93                                98.1M     6% /boot/efi
+nvme1n1
+                                                                                
+nvme2n1
+│                                                                               
+├─nvme2n1p3
+│ │  LVM2_m LVM2                  ZgFg1d-ZPW9-ON6K-cgkA-pgVj-EpQr-KCoZ4G        
+│ └─vg_prod-lv_prod
+│    ext4   1.0                   638c4aa9-bb7e-420e-bdd5-9e03e8caa016      9.1G     0% /LVM1
+├─nvme2n1p1
+│ │  LVM2_m LVM2                  9fpDIo-NHj9-MF7t-7CHR-a70h-kRKA-jtPVFK        
+│ └─vg_prod-lv_prod
+│    ext4   1.0                   638c4aa9-bb7e-420e-bdd5-9e03e8caa016      9.1G     0% /LVM1
+└─nvme2n1p2
+  │  LVM2_m LVM2                  Mz21NE-i0Dy-Spy5-iGg7-N6Nm-hX2y-qA0kPX        
+  ├─vg_test-lv_test
+  │  ext4   1.0                   caef82b3-4f3d-4ff8-a1d4-ca9e1b39766f      1.8G     0% /LVM2
+  └─vg_test-lv_testext
+     ext4   1.0                   b916daeb-dd29-4707-8174-bea72b1aca4d  
+
+root@controlnode:/# mkdir /LVM3
+root@controlnode:/# mount /dev/vg_test/lv_testext
+root@controlnode:/# vim /etc/fstab
+
+
+root@controlnode:/# cat /etc/fstab
+LABEL=cloudimg-rootfs   /        ext4   discard,commit=30,errors=remount-ro    0 1
+LABEL=BOOT      /boot   ext4    defaults        0 2
+LABEL=UEFI      /boot/efi       vfat    umask=0077      0 1
+# UUID=61d8fb8d-813c-41fa-830a-951af4c7c59a /newstorage xfs defaults,nofail 0 2
+/dev/vg_prod/lv_prod    /LVM1   ext4    defaults,nofail 0       2
+/dev/vg_test/lv_test    /LVM2   ext4    defaults,nofail 0       2
+/dev/vg_test/lv_testext /LVM3   ext4    defaults,nofail 0       2
+
+
+root@controlnode:/# systemctl daemon-reload
+root@controlnode:/# mount -a
+
+
+verify
+root@controlnode:/# lsblk -f
+NAME FSTYPE FSVER LABEL           UUID                                   FSAVAIL FSUSE% MOUNTPOINTS
+loop0
+     squash 4.0                                                                0   100% /snap/amazon-ssm-agent/13009
+loop1
+     squash 4.0                                                                0   100% /snap/core22/2411
+loop2
+     squash 4.0                                                                0   100% /snap/amazon-ssm-agent/13349
+loop3
+     squash 4.0                                                                0   100% /snap/snapd/26865
+loop4
+     squash 4.0                                                                0   100% /snap/core22/2955
+loop5
+     squash 4.0                                                                0   100% /snap/snapd/27738
+nvme0n1
+│                                                                               
+├─nvme0n1p1
+│    ext4   1.0   cloudimg-rootfs 553eb6f0-df3b-48cf-b8d3-48b8d7fe5b76      3.3G    50% /
+├─nvme0n1p13
+│    ext4   1.0   BOOT            005a5132-2768-402e-b8f5-1e31db26b1b6    754.9M    17% /boot
+├─nvme0n1p14
+│                                                                               
+└─nvme0n1p15
+     vfat   FAT32 UEFI            032C-9E93                                98.1M     6% /boot/efi
+nvme1n1
+                                                                                
+nvme2n1
+│                                                                               
+├─nvme2n1p3
+│ │  LVM2_m LVM2                  ZgFg1d-ZPW9-ON6K-cgkA-pgVj-EpQr-KCoZ4G        
+│ └─vg_prod-lv_prod
+│    ext4   1.0                   638c4aa9-bb7e-420e-bdd5-9e03e8caa016      9.1G     0% /LVM1
+├─nvme2n1p1
+│ │  LVM2_m LVM2                  9fpDIo-NHj9-MF7t-7CHR-a70h-kRKA-jtPVFK        
+│ └─vg_prod-lv_prod
+│    ext4   1.0                   638c4aa9-bb7e-420e-bdd5-9e03e8caa016      9.1G     0% /LVM1
+└─nvme2n1p2
+  │  LVM2_m LVM2                  Mz21NE-i0Dy-Spy5-iGg7-N6Nm-hX2y-qA0kPX        
+  ├─vg_test-lv_test
+  │  ext4   1.0                   caef82b3-4f3d-4ff8-a1d4-ca9e1b39766f      1.8G     0% /LVM2
+  └─vg_test-lv_testext
+     ext4   1.0                   b916daeb-dd29-4707-8174-bea72b1aca4d      5.3G     0% /LVM3
+
+
+im going to do lvreduce again for vg_test-lv_testext
+
+root@controlnode:/# umount /LVM3
+
+
+root@controlnode:/# e2fsck -f /dev/vg_test/lv_testext
+e2fsck 1.47.2 (1-Jan-2025)
+Pass 1: Checking inodes, blocks, and sizes
+Pass 2: Checking directory structure
+Pass 3: Checking directory connectivity
+Pass 4: Checking reference counts
+Pass 5: Checking group summary information
+/dev/vg_test/lv_testext: 12/380512 files (0.0% non-contiguous), 46589/1520640 blocks
+
+
+root@controlnode:/# resize2fs /dev/vg_test/lv_testext 5G
+resize2fs 1.47.2 (1-Jan-2025)
+Resizing the filesystem on /dev/vg_test/lv_testext to 1310720 (4k) blocks.
+The filesystem on /dev/vg_test/lv_testext is now 1310720 (4k) blocks long.
+
+root@controlnode:/# lvreduce -L 5G /dev/vg_test/lv_testext
+  File system ext4 found on vg_test/lv_testext.
+  File system size (5.00 GiB) is equal to the requested size (5.00 GiB).
+  File system reduce is not needed, skipping.
+  Size of logical volume vg_test/lv_testext changed from 5.80 GiB (1485 extents) to 5.00 GiB (1280 extents).
+  Logical volume vg_test/lv_testext successfully resized.
+
+
+root@controlnode:/# mount /dev/vg_test/lv_testext /LVM3
+root@controlnode:/# systemctl daemon-reload
+root@controlnode:/# mount -a
+
+after reducing i have added that remaing 1gb space in /dev/vg_test/lv_test
+
+root@controlnode:/# lvextend -r -l +100%FREE /dev/vg_test/lv_test
+  File system ext4 found on vg_test/lv_test mounted at /LVM2.
+  Size of logical volume vg_test/lv_test changed from 2.00 GiB (512 extents) to <3.00 GiB (767 extents).
+  Extending file system ext4 to <3.00 GiB (3217031168 bytes) on vg_test/lv_test...
+resize2fs /dev/vg_test/lv_test
+resize2fs 1.47.2 (1-Jan-2025)
+Filesystem at /dev/vg_test/lv_test is mounted on /LVM2; on-line resizing required
+old_desc_blocks = 1, new_desc_blocks = 1
+The filesystem on /dev/vg_test/lv_test is now 785408 (4k) blocks long.
+
+resize2fs done
+  Extended file system ext4 on vg_test/lv_test.
+  Logical volume vg_test/lv_test successfully resized.
+root@controlnode:/# lsblk
+NAME                   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+loop0                    7:0    0 28.2M  1 loop /snap/amazon-ssm-agent/13009
+loop1                    7:1    0   74M  1 loop /snap/core22/2411
+loop2                    7:2    0 28.4M  1 loop /snap/amazon-ssm-agent/13349
+loop3                    7:3    0 49.3M  1 loop /snap/snapd/26865
+loop4                    7:4    0   74M  1 loop /snap/core22/2955
+loop5                    7:5    0 50.3M  1 loop /snap/snapd/27738
+nvme0n1                259:0    0    8G  0 disk
+├─nvme0n1p1            259:1    0  6.9G  0 part /
+├─nvme0n1p13           259:2    0 1023M  0 part /boot
+├─nvme0n1p14           259:3    0    4M  0 part
+└─nvme0n1p15           259:4    0  106M  0 part /boot/efi
+nvme1n1                259:5    0    2G  0 disk
+nvme2n1                259:6    0   20G  0 disk
+├─nvme2n1p3            259:7    0  3.5G  0 part
+│ └─vg_prod-lv_prod    252:0    0  9.8G  0 lvm  /LVM1
+├─nvme2n1p1            259:8    0    8G  0 part
+│ └─vg_prod-lv_prod    252:0    0  9.8G  0 lvm  /LVM1
+└─nvme2n1p2            259:10   0    8G  0 part
+  ├─vg_test-lv_test    252:1    0    3G  0 lvm  /LVM2
+  └─vg_test-lv_testext 252:2    0    5G  0 lvm  /LVM3
+
+
+
+root@controlnode:/# lsblk
+NAME                   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+loop0                    7:0    0 28.2M  1 loop /snap/amazon-ssm-agent/13009
+loop1                    7:1    0   74M  1 loop /snap/core22/2411
+loop2                    7:2    0 28.4M  1 loop /snap/amazon-ssm-agent/13349
+loop3                    7:3    0 49.3M  1 loop /snap/snapd/26865
+loop4                    7:4    0   74M  1 loop /snap/core22/2955
+loop5                    7:5    0 50.3M  1 loop /snap/snapd/27738
+nvme0n1                259:0    0    8G  0 disk
+├─nvme0n1p1            259:1    0  6.9G  0 part /
+├─nvme0n1p13           259:2    0 1023M  0 part /boot
+├─nvme0n1p14           259:3    0    4M  0 part
+└─nvme0n1p15           259:4    0  106M  0 part /boot/efi
+nvme1n1                259:5    0    2G  0 disk
+nvme2n1                259:6    0   20G  0 disk
+├─nvme2n1p3            259:7    0  3.5G  0 part
+│ └─vg_prod-lv_prod    252:0    0  9.8G  0 lvm  /LVM1
+├─nvme2n1p1            259:8    0    8G  0 part
+│ └─vg_prod-lv_prod    252:0    0  9.8G  0 lvm  /LVM1
+└─nvme2n1p2            259:10   0    8G  0 part
+  ├─vg_test-lv_test    252:1    0    3G  0 lvm  /LVM2
+  └─vg_test-lv_testext 252:2    0    5G  0 lvm  /LVM3
+
+
+
+root@controlnode:/# resize2fs /dev/vg_test/lv_test
+resize2fs 1.47.2 (1-Jan-2025)
+The filesystem is already 785408 (4k) blocks long.  Nothing to do!
+
+root@controlnode:/# resize2fs /dev/vg_test/lv_testext
+resize2fs 1.47.2 (1-Jan-2025)
+The filesystem is already 1310720 (4k) blocks long.  Nothing to do!
+
+root@controlnode:/# mount -a

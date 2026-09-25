@@ -1,0 +1,25 @@
+---
+- name: setup apache2 and open fiewall port
+  hosts: all
+
+  tasks:
+    - name: install apche2 package
+      ansible.builtin.apt:
+        name: apache2
+        state: present
+
+    - name: start the apache2
+      ansible.builtin.service:
+        name: apache2
+        state: started
+
+    - name: open port 80 for http access
+      firewalld:
+       service: http
+       permanent: true
+       state: enabled
+    
+    - name: restart firewalld service to load firewall changes
+      ansible.builtin.service:
+       name: firewalld
+       state: reloaded     

@@ -1,0 +1,32 @@
+---
+
+- name: Create and mount new storage
+  hosts: localhost
+
+  tasks:
+    - name: Create a new partition
+      parted: 
+        name: files
+        label: gpt
+        device: /dev/nvme1n1
+        number: 1
+        state: present
+        part_start: 1MiB
+        part_end: 1GiB
+
+    - name: Create xfs file system
+      filesystem: 
+          dev: /dev/nvme1n1p1
+          fstype: xfs
+
+    - name: Create mount directory
+      file:
+        path: /newstorage
+        state: directory
+
+    - name: Mount the filesystem
+      mount:
+        path: /newstorage
+        src: /dev/nvme1n1p1
+        fstype: xfs
+        state: mounted

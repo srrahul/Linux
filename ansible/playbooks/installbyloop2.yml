@@ -1,0 +1,13 @@
+---
+
+- name: Install packages through Loop
+  hosts: localhost
+  vars:
+    packages: [telnet,ftp,htop]
+
+  tasks:
+    - name: Install packages
+      apt:
+        name: '{{packages}}'
+        state: present
+

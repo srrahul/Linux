@@ -1,0 +1,21 @@
+---
+- name: APACHE AND TELNET
+  hosts: all
+
+  tasks:
+    - name: Install apache2
+      ansible.builtin.apt:
+        name: apache2
+        state: present
+        update_cache: true
+
+    - name: start apache2
+      service:
+         name: apache2
+         state: started
+
+    - name: install telnet
+      ansible.builtin.apt:
+         name: telnet
+         state: present
+         update_cache: true

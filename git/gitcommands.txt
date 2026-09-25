@@ -1,0 +1,306 @@
+Commands for Ubuntu linux for GitHub
+===================================
+
+1. Install Git
+
+sudo apt update
+sudo apt install git -y
+
+Check:
+git --version
+
+----------------------------------------------------------------
+
+2. Configure your Git identity
+
+git config --global user.name "srrahul"
+git config --global user.email "srrahul55@gmail.com"
+
+Verify:
+git config --global --list
+
+-------------------------------------------------------------------
+
+3. Create or enter the project directory and User
+
+User creation:
+useradd rahul
+passwd rahul
+
+verify:
+getent passwd rahul
+
+mkdir /home/rahul
+
+
+mkdir /home/rahul/linux-ansible
+cd /home/rahul/linux-ansible
+
+Check your location:
+pwd
+ls -la
+
+copy my files from /etc/ansible to /home/rahul/linux-ansible
+
+cp -r /etc/ansible /home/rahul/linux-ansible
+
+chown -R rahul:rahul /home/rahul/linux-ansible
+chmod 777 /home/rahul/linux-ansible
+
+------------------------------------------------------------------------
+
+4. Initialize Git
+
+git init
+
+This creates a hidden .git directory that stores Git history and configuration.
+
+ls -la
+git status
+
+Do not repeatedly run git init if .git already exists.
+
+git status
+
+Git will show:
+
+Untracked files: Git is not tracking them yet.
+Modified files: tracked files have changed.
+Staged files: ready to be committed.
+Working tree clean: there are no new changes.
+
+
+-------------------------------------------------------------------------------
+
+7. Add files to the staging area
+
+Add one file:
+git add ansible/
+
+Add an entire folder:
+git add ansible/
+
+Add all changes in the repository:
+git add .
+
+Verify staged files:
+git status
+
+View staged changes:
+git diff --staged
+
+-------------------------------------------------------------------------------
+
+8. Remove a file from staging
+
+This keeps the file but removes it from the staging area:
+
+git restore --staged ansible/playbook.yml
+
+git restore --cached ansible/playbook.yml
+
+Remove everything from staging:
+git restore --staged .
+
+Verify:
+git status
+git log --oneline
+
+If Git says:
+nothing to commit, working tree clean
+there are no new changes since your last commit.
+
+-------------------------------------------------------------------------------
+
+
+10. Rename the branch
+
+To use main:
+
+git branch -M main
+
+Or continue using master if that is your preferred branch:
+git branch --show-current
+
+-------------------------------------------------------------------------------
+
+11. Create the remote GitHub repository
+
+On GitHub:
+
+Select New repository.
+Enter the repository name, such as Linux. eg: srrahul/Linux
+If your local repository already has commits, create an empty repository.
+Do not add a README, .gitignore, or license during creation.
+
+------------------------------------------------------------------------------
+
+12. Configure SSH authentication
+
+ssh-keygen in /home/rahul/linux-ansible
+
+enter thrice to get the .pub file
+
+got to pub file directory cat /home/rahul/.ssh/id_ed25519.pub to get the key
+
+Copy the complete output and add it under:
+
+GitHub profile icon → Settings → SSH and GPG keys → New SSH key
+
+Never share this private key:
+paste that pub file contents in that github ui ssh key tab and give title Controlnode
+
+
+Test authentication:
+ssh -T git@github.com
+
+On the first connection, enter:
+yes
+
+Successful authentication should show:
+Hi srrahul! You've successfully authenticated...
+
+
+-------------------------------------------------------------------------------
+
+13. Add the GitHub remote
+
+If the repository belongs to srrahul:
+
+git remote add origin git@github.com:srrahul/Linux.git
+
+Verify:
+git remote -v
+
+-------------------------------------------------------------------------------
+
+14. Push the branch to GitHub
+
+For master:
+git push -u origin master
+
+or 
+
+git push origin master
+
+The -u connects your local branch to its remote branch. After the first push, you can usually use:
+
+git push
+
+------------------------------------------------------------------------------
+
+***Complete example***:
+======================
+git add ansible/
+
+git commit -m "Add Ansible configuration files"
+
+git branch -M master
+
+git remote add origin git@github.com:srrahul/Linux.git
+git remote -v
+
+ssh -T git@github.com
+git push -u origin main
+
+
+------------------------------------------------------------------------------
+
+
+Useful remote commands
+
+Show configured remotes:
+git remote -v
+
+Change an incorrect remote URL:
+git remote set-url origin git@github.com:srrahul/Linux.git
+
+Remove the remote connection:
+git remote remove origin
+
+Removing origin does not delete local files, commits, or the GitHub repository.
+
+
+
+-------------------------------------------------------------------------------
+
+Useful history commands
+
+Show full history:
+git log
+
+Show concise history:
+git log --oneline
+
+Show the last three commits:
+
+git log -3 --oneline
+
+or
+
+git log -3 or git log -n 3
+
+
+Show branches visually:
+git log --oneline --graph --decorate --all
+
+
+------------------------------------------------------------------------------
+
+Branch commands
+
+List branches:
+git branch
+
+
+Create a branch:
+git branch feature/playbook
+
+Create and switch to it:
+git switch -c feature/playbook
+
+Switch branches:
+git switch main
+
+Push the new branch:
+git push -u origin feature/playbook
+
+Merge it into main:
+git switch main
+git pull
+git merge feature/playbook
+git push
+
+
+------------------------------------------------------------------------------
+
+Ignore files
+
+
+Create .gitignore:
+touch .gitignore
+
+Open it:
+vim .gitignore
+
+touch  "home.txt" .gitignore
+
+Example contents:
+*.log
+*.tmp
+.vault_pass
+secrets.yml
+
+
+Then commit it:
+git add .gitignore
+git commit -m "Add Git ignore rules"
+git push
+
+
+
+
+
+
+
+

@@ -1,0 +1,378 @@
+**********************LVM CREATION************************
+
+i have attached new ebs volume to the control node(ubuntu linux) for 20 GB
+
+new voulume has been created in the controlnode availability zone then only we can attach the new volume
+
+after attaching checked in control node:
+
+
+root@controlnode:~# lsblk
+NAME         MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+loop0          7:0    0 28.2M  1 loop /snap/amazon-ssm-agent/13009
+loop1          7:1    0   74M  1 loop /snap/core22/2411
+loop2          7:2    0 28.4M  1 loop /snap/amazon-ssm-agent/13349
+loop3          7:3    0 49.3M  1 loop /snap/snapd/26865
+loop4          7:4    0   74M  1 loop /snap/core22/2955
+loop5          7:5    0 50.3M  1 loop /snap/snapd/27738
+nvme0n1      259:0    0    8G  0 disk
+├─nvme0n1p1  259:1    0  6.9G  0 part /
+├─nvme0n1p13 259:2    0 1023M  0 part /boot
+├─nvme0n1p14 259:3    0    4M  0 part
+└─nvme0n1p15 259:4    0  106M  0 part /boot/efi
+nvme1n1      259:5    0    2G  0 disk
+nvme2n1      259:6    0   20G  0 disk
+
+20G nvme2n1 disk has been added to the control node linux server
+=======================================================================================================================================================================
+
+DISK PARTITION
+**************
+
+after that i created 2 primary partition for 8+8=16 G using fdisk /dev/nvme2n1
+
+
+Device         Boot    Start      End  Sectors Size Id Type
+/dev/nvme2n1p1          2048 16779263 16777216   8G 83 Linux
+/dev/nvme2n1p2      16779264 33556479 16777216   8G 83 Linux
+
+
+To verify the partition
+root@controlnode:~# lsblk
+NAME         MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+loop0          7:0    0 28.2M  1 loop /snap/amazon-ssm-agent/13009
+loop1          7:1    0   74M  1 loop /snap/core22/2411
+loop2          7:2    0 28.4M  1 loop /snap/amazon-ssm-agent/13349
+loop3          7:3    0 49.3M  1 loop /snap/snapd/26865
+loop4          7:4    0   74M  1 loop /snap/core22/2955
+loop5          7:5    0 50.3M  1 loop /snap/snapd/27738
+nvme0n1      259:0    0    8G  0 disk
+├─nvme0n1p1  259:1    0  6.9G  0 part /
+├─nvme0n1p13 259:2    0 1023M  0 part /boot
+├─nvme0n1p14 259:3    0    4M  0 part
+└─nvme0n1p15 259:4    0  106M  0 part /boot/efi
+nvme1n1      259:5    0    2G  0 disk
+nvme2n1      259:6    0   20G  0 disk
+├─nvme2n1p1  259:8    0    8G  0 part
+└─nvme2n1p2  259:10   0    8G  0 part
+
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+LVM Creation:
+============
+
+we are using for flexible disk management and also we can resize and manage
+
+Tradtional  disk crate we cannot resize
+
+resize without downtime
+
+easy management- we can extend and we can reduce too
+
+we can take snapshot and easily restore
+ storage we can extend whenever the filesystem is going to full
+
+LVM Components:
+Disk -> PV -> VG -> LV
+
+check disk:
+lsblk
+fdisk -l
+df -hT
+
+
+create Physical Volume:
+
+root@controlnode:/# pvcreate /dev/nvme2n1p1
+  Physical volume "/dev/nvme2n1p1" successfully created.
+
+root@controlnode:~# pvdisplay
+  --- Physical volume ---
+  PV Name               /dev/nvme2n1p1
+  VG Name               vg_prod
+  PV Size               8.00 GiB / not usable 4.00 MiB
+  Allocatable           yes
+  PE Size               4.00 MiB
+  Total PE              2047
+  Free PE               2047
+  Allocated PE          0
+  PV UUID               9fpDIo-NHj9-MF7t-7CHR-a70h-kRKA-jtPVFK
+
+
+then need to create volume group:
+
+
+root@controlnode:~# vgcreate vg_prod /dev/nvme2n1p1
+  Physical volume "/dev/nvme2n1p1" successfully created.
+  Volume group "vg_prod" successfully created
+
+i have created one volume group in the first partition nvme2n1p1 using the name vg_prod
+
+
+verify that volume group
+
+root@controlnode:~# vgdisplay
+  --- Volume group ---
+  VG Name               vg_prod
+  System ID
+  Format                lvm2
+  Metadata Areas        1
+  Metadata Sequence No  1
+  VG Access             read/write
+  VG Status             resizable
+  MAX LV                0
+  Cur LV                0
+  Open LV               0
+  Max PV                0
+  Cur PV                1
+  Act PV                1
+  VG Size               <8.00 GiB
+  PE Size               4.00 MiB
+  Total PE              2047
+  Alloc PE / Size       0 / 0
+  Free  PE / Size       2047 / <8.00 GiB
+  VG UUID               mKlD1a-feyW-2xgX-Zmyc-XlS3-Agoc-jufizZ
+
+
+verify the physical volume as well it shows both PV and VG has been created
+
+root@controlnode:~# pvdisplay
+  --- Physical volume ---
+  PV Name               /dev/nvme2n1p1
+  VG Name               vg_prod
+  PV Size               8.00 GiB / not usable 4.00 MiB
+  Allocatable           yes
+  PE Size               4.00 MiB
+  Total PE              2047
+  Free PE               2047
+  Allocated PE          0
+  PV UUID               9fpDIo-NHj9-MF7t-7CHR-a70h-kRKA-jtPVFK
+
+next we need to create a logical volume after volume group creation
+
+
+root@controlnode:~# lvcreate -n lv_prod -L 7.8G vg_prod
+  Rounding up size to full physical extent 7.80 GiB
+  Logical volume "lv_prod" created.
+
+
+verify that it is created or not
+
+
+root@controlnode:~# lvdisplay
+  --- Logical volume ---
+  LV Path                /dev/vg_prod/lv_prod
+  LV Name                lv_prod
+  VG Name                vg_prod
+  LV UUID                z3uZcA-iRAx-iY4x-1WH5-keX2-sEOd-xc2mi9
+  LV Write Access        read/write
+  LV Creation host, time controlnode, 2026-09-24 05:34:24 +0000
+  LV Status              available
+  # open                 0
+  LV Size                7.80 GiB
+  Current LE             1997
+  Segments               1
+  Allocation             inherit
+  Read ahead sectors     auto
+  - currently set to     256
+  Block device           252:0
+
+
+check lsblk to verify that lvm is created or not
+
+
+root@controlnode:~# lsblk
+NAME                MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+loop0                 7:0    0 28.2M  1 loop /snap/amazon-ssm-agent/13009
+loop1                 7:1    0   74M  1 loop /snap/core22/2411
+loop2                 7:2    0 28.4M  1 loop /snap/amazon-ssm-agent/13349
+loop3                 7:3    0 49.3M  1 loop /snap/snapd/26865
+loop4                 7:4    0   74M  1 loop /snap/core22/2955
+loop5                 7:5    0 50.3M  1 loop /snap/snapd/27738
+nvme0n1             259:0    0    8G  0 disk
+├─nvme0n1p1         259:1    0  6.9G  0 part /
+├─nvme0n1p13        259:2    0 1023M  0 part /boot
+├─nvme0n1p14        259:3    0    4M  0 part
+└─nvme0n1p15        259:4    0  106M  0 part /boot/efi
+nvme1n1             259:5    0    2G  0 disk
+nvme2n1             259:6    0   20G  0 disk
+├─nvme2n1p1         259:8    0    8G  0 part
+│ └─vg_prod-lv_prod 252:0    0  7.8G  0 lvm
+└─nvme2n1p2         259:10   0    8G  0 part
+
+
+Format & Mount
+**************
+next we need to create a filesystem to ready for mount for that format and make filesystem ready
+
+
+
+
+root@controlnode:~# mkfs.ext4 /dev/vg_prod/lv_prod
+mke2fs 1.47.2 (1-Jan-2025)
+Creating filesystem with 2044928 4k blocks and 512064 inodes
+Filesystem UUID: 638c4aa9-bb7e-420e-bdd5-9e03e8caa016
+Superblock backups stored on blocks:
+        32768, 98304, 163840, 229376, 294912, 819200, 884736, 1605632
+
+Allocating group tables: done
+Writing inode tables: done
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done
+
+
+next we need to mount that disk or partitioned disk or lvm
+
+before make sure we have the directory or create directory for mount
+
+root@controlnode:~# mkdir /LVM1
+
+
+root@controlnode:/# mount /dev/vg_prod/lv_prod /LVM1
+
+mount will have no output if we want to check that it is mounted or not please check
+
+
+
+root@controlnode:/# df -hT
+Filesystem                  Type      Size  Used Avail Use% Mounted on
+/dev/root                   ext4      6.7G  3.5G  3.2G  53% /
+tmpfs                       tmpfs     3.8G     0  3.8G   0% /dev/shm
+tmpfs                       tmpfs     1.6G  1.2M  1.6G   1% /run
+efivarfs                    efivarfs  128K  3.3K  120K   3% /sys/firmware/efi/efivars
+tmpfs                       tmpfs     3.8G     0  3.8G   0% /tmp
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/systemd-journald.service
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/systemd-resolved.service
+/dev/nvme0n1p13             ext4      989M  166M  756M  18% /boot
+/dev/nvme0n1p15             vfat      105M  6.3M   99M   7% /boot/efi
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/systemd-networkd.service
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/getty@tty1.service
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/serial-getty@ttyS0.service
+tmpfs                       tmpfs     778M  8.0K  778M   1% /run/user/1000
+/dev/mapper/vg_prod-lv_prod ext4      7.6G  2.0M  7.2G   1% /LVM1
+
+As of now we did this as temperory mount and to add it as permanent mount we need to add the below entry in /etc/fstab otherwise when boot it will not show
+
+before we need to take backup of fstab by cp /etc/fstab /etc/fstab.backup
+
+then vim /etc/fstab
+
+
+root@controlnode:/# cp /etc/fstab /etc/fstab.backup
+root@controlnode:/# vim /etc/fstab
+
+add this /dev/vg_prod/lv_prod    /LVM1           ext4    defaults,nofail 0 2  entry in fstab file
+ 
+root@controlnode:/# cat /etc/fstab
+LABEL=cloudimg-rootfs   /        ext4   discard,commit=30,errors=remount-ro    0 1
+LABEL=BOOT      /boot   ext4    defaults        0 2
+LABEL=UEFI      /boot/efi       vfat    umask=0077      0 1
+# UUID=61d8fb8d-813c-41fa-830a-951af4c7c59a /newstorage xfs defaults,nofail 0 2
+/dev/vg_prod/lv_prod    /LVM1           ext4    defaults,nofail 0 2
+
+
+/dev/vg_prod/lv_prod = LVM path
+/LVM1                                  = mount path
+ext4		    = filesystem
+defaults                              = default mounting options will apply
+0                                             = Dump/backup
+2                                             = fsck check while boot(filesystemcheck)
+
+to verify there is no error
+
+type mount -a
+
+root@controlnode:/# mount -a
+
+if no ouput is there then it is correct otherwise it has some problem
+
+
+
+so LVM1 is created using EXT4 and it is mounted in /LVM1
+
+
+=======================================================================================================================================================================
+
+im going to repeate the same process for lvm 2 in second partition
+
+
+
+
+root@controlnode:/# mkdir /LVM2
+
+root@controlnode:/# vgcreate vg_test /dev/nvme2n1p2
+  Physical volume "/dev/nvme2n1p2" successfully created.
+  Volume group "vg_test" successfully created
+
+root@controlnode:/# lvcreate -n lv_test -L 7.8G vg_test
+  Rounding up size to full physical extent 7.80 GiB
+  Logical volume "lv_test" created.
+
+root@controlnode:/# mkfs.ext4 /dev/vg_test/lv_test
+mke2fs 1.47.2 (1-Jan-2025)
+Creating filesystem with 2044928 4k blocks and 512064 inodes
+Filesystem UUID: caef82b3-4f3d-4ff8-a1d4-ca9e1b39766f
+Superblock backups stored on blocks:
+        32768, 98304, 163840, 229376, 294912, 819200, 884736, 1605632
+
+Allocating group tables: done
+Writing inode tables: done
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done
+
+
+root@controlnode:/# mount /dev/vg_test/lv_test /LVM2
+
+cp /etc/fstab /etc/fstab.backup
+
+root@controlnode:/# vim /etc/fstab
+root@controlnode:/# mount -a
+root@controlnode:/# cat /etc/fstab
+LABEL=cloudimg-rootfs   /        ext4   discard,commit=30,errors=remount-ro    0 1
+LABEL=BOOT      /boot   ext4    defaults        0 2
+LABEL=UEFI      /boot/efi       vfat    umask=0077      0 1
+# UUID=61d8fb8d-813c-41fa-830a-951af4c7c59a /newstorage xfs defaults,nofail 0 2
+/dev/vg_prod/lv_prod    /LVM1           ext4    defaults,nofail 0 2
+/dev/vg_test/lv_test    /LVM2   ext4    defaults,nofail 0       2
+
+
+
+root@controlnode:/# df -hT
+Filesystem                  Type      Size  Used Avail Use% Mounted on
+/dev/root                   ext4      6.7G  3.5G  3.2G  53% /
+tmpfs                       tmpfs     3.8G     0  3.8G   0% /dev/shm
+tmpfs                       tmpfs     1.6G  1.2M  1.6G   1% /run
+efivarfs                    efivarfs  128K  3.3K  120K   3% /sys/firmware/efi/efivars
+tmpfs                       tmpfs     3.8G     0  3.8G   0% /tmp
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/systemd-journald.service
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/systemd-resolved.service
+/dev/nvme0n1p13             ext4      989M  166M  756M  18% /boot
+/dev/nvme0n1p15             vfat      105M  6.3M   99M   7% /boot/efi
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/systemd-networkd.service
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/getty@tty1.service
+none                        tmpfs     1.0M     0  1.0M   0% /run/credentials/serial-getty@ttyS0.service
+tmpfs                       tmpfs     778M  8.0K  778M   1% /run/user/1000
+/dev/mapper/vg_prod-lv_prod ext4      7.6G  2.0M  7.2G   1% /LVM1
+/dev/mapper/vg_test-lv_test ext4      7.6G  2.0M  7.2G   1% /LVM2
+
+
+root@controlnode:/# lsblk
+NAME                MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+loop0                 7:0    0 28.2M  1 loop /snap/amazon-ssm-agent/13009
+loop1                 7:1    0   74M  1 loop /snap/core22/2411
+loop2                 7:2    0 28.4M  1 loop /snap/amazon-ssm-agent/13349
+loop3                 7:3    0 49.3M  1 loop /snap/snapd/26865
+loop4                 7:4    0   74M  1 loop /snap/core22/2955
+loop5                 7:5    0 50.3M  1 loop /snap/snapd/27738
+nvme0n1             259:0    0    8G  0 disk
+├─nvme0n1p1         259:1    0  6.9G  0 part /
+├─nvme0n1p13        259:2    0 1023M  0 part /boot
+├─nvme0n1p14        259:3    0    4M  0 part
+└─nvme0n1p15        259:4    0  106M  0 part /boot/efi
+nvme1n1             259:5    0    2G  0 disk
+nvme2n1             259:6    0   20G  0 disk
+├─nvme2n1p1         259:8    0    8G  0 part
+│ └─vg_prod-lv_prod 252:0    0  7.8G  0 lvm  /LVM1
+└─nvme2n1p2         259:10   0    8G  0 part
+  └─vg_test-lv_test 252:1    0  7.8G  0 lvm  /LVM2

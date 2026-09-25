@@ -1,0 +1,14 @@
+---
+- name: install and start apache
+  hosts: localhost
+
+  tasks:
+    - name: installing apache
+      ansible.builtin.apt:
+        name: apache2
+        state: present
+
+    - name: starting apache
+      ansible.builtin.service:
+         name: apache2
+         state: started    

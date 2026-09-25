@@ -1,0 +1,256 @@
+This script checks every mounted filesystem and prints a warning when disk usage is 80% or higher.
+
+#!/bin/bash
+#! is called the shebang.
+/bin/bash tells Linux to execute the script using Bash.
+threshold=80
+Creates a variable named threshold.
+Stores the value 80.
+There must be no spaces around = in Bash.
+
+Correct:
+
+threshold=80
+
+Incorrect:
+
+threshold = 80
+df -P
+df means disk filesystem. It displays filesystem usage.
+-P requests the POSIX output format.
+POSIX format keeps each filesystem's information on one line, making it easier for awk to process.
+
+Example:
+
+Filesystem     1024-blocks      Used Available Capacity Mounted on
+/dev/sda1          20509264  12305560   7137824      64% /
+/dev/sdb1           2050000   1742500    307500      85% /data
+|
+
+The pipe sends the output of the command on its left to the command on its right.
+
+Here:
+
+df output → awk → while loop
+awk 'NR>1 {print $5, $6}'
+
+awk processes the output line by line.
+
+NR>1
+NR means number of records or the current line number.
+NR>1 means process only lines after line 1.
+This skips the heading:
+Filesystem ... Capacity Mounted on
+{print $5, $6}
+
+The $ fields here belong to awk, not Bash:
+
+$5 is disk usage percentage, such as 85%.
+$6 is the mount point, such as /data.
+
+Therefore, this:
+
+df -P | awk 'NR>1 {print $5, $6}'
+
+produces:
+
+64% /
+85% /data
+while read -r usage mountpoint
+
+This starts a loop that reads one input line at a time.
+
+For this line:
+
+85% /data
+
+Bash assigns:
+
+usage="85%"
+mountpoint="/data"
+read
+
+Reads a line from standard input.
+
+-r
+
+Prevents read from treating backslashes as escape characters. It is considered safer when reading raw text.
+
+usage mountpoint
+
+These are the two variables receiving the values from each line.
+
+The loop repeats once for every filesystem.
+
+do
+
+Marks the beginning of the commands that the while loop will execute.
+
+The structure is:
+
+while condition
+do
+    commands
+done
+usage=${usage%\%}
+
+This removes the % character from the value.
+
+Before:
+
+usage="85%"
+
+After:
+
+usage="85"
+Breaking down the syntax
+${variable%pattern}
+${...} performs Bash variable expansion.
+usage is the variable.
+% removes the shortest matching pattern from the end of the value.
+\% represents the literal % character.
+
+A simpler version that also works is:
+
+usage=${usage%\%}
+
+This removal is necessary because numerical comparison should use 85, not 85%.
+
+Do not confuse the two % characters:
+
+First % is the Bash removal operator.
+Second \% is the character being removed.
+if [ "$usage" -ge "$threshold" ]; then
+
+This condition checks whether the current disk usage is greater than or equal to the threshold.
+
+For example:
+
+[ "85" -ge "80" ]
+
+The condition is true, so the warning is printed.
+
+if
+
+Starts a conditional statement.
+
+[ ... ]
+
+The square brackets execute Bash’s test command.
+
+The spaces are compulsory:
+
+Correct:
+
+[ "$usage" -ge "$threshold" ]
+
+Incorrect:
+
+["$usage" -ge "$threshold"]
+"$usage"
+
+Contains the current disk-usage value.
+
+Quotes help prevent errors caused by empty values or unexpected splitting.
+
+-ge
+
+Means greater than or equal to for integers.
+
+Common numerical operators:
+
+Operator	Meaning
+-eq	Equal
+-ne	Not equal
+-gt	Greater than
+-ge	Greater than or equal
+-lt	Less than
+-le	Less than or equal
+"$threshold"
+
+Contains the configured limit, which is 80.
+
+;
+
+Separates the test command from then when both are written on the same line.
+
+These two forms are equivalent:
+
+if [ "$usage" -ge "$threshold" ]; then
+if [ "$usage" -ge "$threshold" ]
+then
+then
+
+Starts the commands that should run when the condition is true.
+
+echo "Warning: $mountpoint usage is ${usage}%"
+
+Prints the warning.
+
+Example:
+
+Warning: /data usage is 85%
+Variable expansion
+$mountpoint becomes /data.
+${usage} becomes 85.
+The final % is normal text added to the output.
+
+Braces are used here:
+
+${usage}%
+
+This clearly separates the variable name usage from the % character.
+
+Double quotes allow variables to be expanded. Single quotes would print them literally:
+
+echo '$usage'
+
+Output:
+
+$usage
+fi
+
+Ends the if statement.
+
+The structure is:
+
+if condition; then
+    command
+fi
+done
+
+Ends the while loop. The script then processes the next filesystem until no input lines remain.
+
+Complete execution flow
+
+Suppose df -P contains:
+
+Filesystem Capacity Mounted on
+/dev/sda1        65% /
+/dev/sdb1        85% /data
+
+The script processes / first:
+
+usage="65%"
+mountpoint="/"
+usage="65"
+
+It evaluates:
+
+[ 65 -ge 80 ]
+
+This is false, so nothing is printed.
+
+It then processes /data:
+
+usage="85%"
+mountpoint="/data"
+usage="85"
+
+It evaluates:
+
+[ 85 -ge 80 ]
+
+This is true, so it prints:
+
+Warning: /data usage is 85%

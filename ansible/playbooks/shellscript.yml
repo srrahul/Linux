@@ -1,0 +1,7 @@
+---
+- name: playbook or shell script
+  hosts: 172.31.13.32
+
+  tasks:
+    - name: run shell script
+      shell: "/home/ubuntu/cfile.sh"

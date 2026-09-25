@@ -1,0 +1,17 @@
+---
+
+- name: Package Installation
+  hosts: all
+  vars:
+    pack: apache2
+
+  tasks:
+    - name: Install Apache2
+      apt:
+        name: "{{ pack }}"
+        state: present
+
+    - name: Starte Apache2
+      service:
+        name: "{{ pack }}"
+        state: started    

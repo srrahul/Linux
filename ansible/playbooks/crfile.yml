@@ -1,0 +1,27 @@
+---
+- name: create and remove file
+  hosts: all
+
+  tasks:
+    - name: create a directory
+      file:
+        path: /tmp/seinfeld
+        owner: ubuntu
+        group: ubuntu
+        mode: 700
+        state: directory
+    - name: create a file in that directory
+      file:
+        path: /tmp/seinfeld/jerry
+        state: touch
+    - name: stat the new file jerry
+      ansible.builtin.stat:
+        path: /tmp/seinfeld/jerry
+      register: jf
+    - name: show file status
+      debug:
+        msg: file status and attributes {{jf}}
+    - name: remove file
+      file:
+        path: /tmp/seinfeld/jerry
+        state: absent    
