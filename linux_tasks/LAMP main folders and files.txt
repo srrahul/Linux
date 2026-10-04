@@ -1,0 +1,54 @@
+Apache
+- Main config: /etc/httpd/conf/httpd.conf
+- Extra configs: /etc/httpd/conf.d/
+- Website files: /var/www/html/
+- Access log: /var/log/httpd/access_log
+- Error log: /var/log/httpd/error_log
+- Service: httpd
+
+PHP
+- Main config: /etc/php.ini
+- Extra module configs: /etc/php.d/
+- PHP-FPM config: /etc/php-fpm.conf
+- PHP-FPM pool config: /etc/php-fpm.d/www.conf
+- PHP-FPM error log: /var/log/php-fpm/www-error.log
+- Your PHP files: /var/www/html/*.php
+- Service: php-fpm
+
+MySQL
+- Main config usually: /etc/my.cnf
+- Extra configs: /etc/my.cnf.d/
+- Database data: /var/lib/mysql/
+- MySQL log commonly: /var/log/mysqld.log
+- Socket commonly: /var/lib/mysql/mysql.sock
+- Service: mysqld
+
+Linux / system
+- Service unit files: /usr/lib/systemd/system/
+- Custom systemd overrides: /etc/systemd/system/
+- System logs: journalctl
+- Firewall config runtime: firewall-cmd
+- SELinux config: /etc/selinux/config
+- SELinux contexts/checks: ls -Z, restorecon
+
+
+
+
+
+For your exact lab, the most important paths to remember are:
+/etc/httpd/conf/httpd.conf
+/var/www/html/
+/var/log/httpd/
+/etc/php.ini
+/etc/php.d/
+/var/log/php-fpm/
+/etc/my.cnf
+/var/lib/mysql/
+/var/log/mysqld.log
+
+And the core troubleshooting flow is:
+Apache issue  → /var/log/httpd/error_log
+PHP issue     → /var/log/php-fpm/www-error.log
+MySQL issue   → /var/log/mysqld.log
+Service issue → systemctl status <service>
+System issue  → journalctl -u <service>

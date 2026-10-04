@@ -1,0 +1,161 @@
+Kernel panic errors
+
+Both vmlinuz file or initramfs file can cause a kernel panic / boot failure, but they fail at different stages.
+
+If the vmlinuz kernel file is missing/corrupt, GRUB cannot properly load the Linux kernel. You may see errors like:
+error: file '/vmlinuz-...' not found
+or the kernel may fail immediately very early in boot.
+
+If the initramfs file is missing/corrupt, the kernel itself loads, but then it cannot initialize the early userspace needed to find/mount the real root filesystem. This commonly leads to messages such as:
+
+Kernel panic - not syncing: VFS: Unable to mount root fs
+ or
+- dracut emergency shell
+
+vmlinuz = actual Linux kernel
+initramfs = temporary early root filesystem used by the kernel during boot
+
+“If vmlinuz is missing, the kernel itself cannot be loaded. If initramfs is missing or corrupted, the kernel may load but fail to mount the root filesystem, often causing a VFS kernel panic or dropping into dracut emergency mode.”
+
+
+it happens when initramfs file is deleted due to some OS patch update  or corrupt initrmsfs file after any upgrade
+
+There are three methods to resolve kernel panic errors
+
+
+1st method:
+==========
+from grub screen we can select either  old kernel or kernel with rescue mode and it will automatically login in to the machine and from machine we need to regenerate initramfs file using dracut command
+
+After login to the old machine with old kernel or kernel with rescue mode enter below command 
+
+to check the latest kernel version
+
+[root@controlnode boot]# rpmquery kernel
+kernel-6.12.0-269.el10.x86_64
+
+[root@controlnode boot]# uname -r
+6.12.0-269.el10.x86_64
+
+create a dracut command to generate the initramfs file
+[root@controlnode]# dracut -f /boot/initramfs-6.12.0-269.el10.x86_64.img 6.12.0-269.el10.x86_64
+
+
+2nd method:
+===========
+
+for some reason both old kernel and kernel with rescue mode will not be available to resolve this at that time
+
+From grub screen select the current kernel os and   press c to enter it to the grub command shell
+
+from there
+
+grub> ls
+
+tehn check each partition to find the vmlinuz and initramfs old version file or rescue files
+grub> ls (hd0,gpt2)/
+grub> ls (hd0,gpt1)/
+grub> ls (hd0,gpt3)/
+
+find out the default boot partition and files for me it is hd0,gpt2
+
+grub>  set root = (hd0,gpt2)
+
+if we want to find the root Linux device path
+
+grub> insmod lvm
+grub> ls
+
+You may see:
+(hd0) (hd0,gpt1) (hd0,gpt2) (hd0,gpt3)
+(lvm/cs-root) (lvm/cs-swap)
+
+VG = cs
+LV = root
+
+Therefore the Linux device-mapper path is:
+
+/dev/mapper/cs-root
+
+You can confirm GRUB can see that LV:
+grub> ls (lvm/cs-root)/
+
+then type below command
+
+for newer linux OS version use linux and initrd for older use linux16 and intrd6 respectively
+
+old kernel file
+grub>  linux /vmlinuz-6.12.0-269.el10.x86_64 root=/dev/mapper/cs-root ro
+
+grub> initrd /initramfs-6.12.0-269.el10.x86_64.img
+
+grub> boot
+
+
+or 
+
+rescue files
+
+grub>  linux /vmlinuz-0-rescue-8e101a5df38f49a480a1c43d5b16f248 root=/dev/mapper/cs-root ro
+
+grub> initrd /initramfs-0-rescue-8e101a5df38f49a480a1c43d5b16f248.img
+
+grub> boot
+
+from that it will login to the machie with old kernel or rescue kernel and then use below same command as 1st method to resolve this issue
+
+[root@controlnode]# rpmquery kernel
+kernel-6.12.0-269.el10.x86_64
+
+[root@controlnode]# uname -r
+6.12.0-269.el10.x86_64
+
+[root@controlnode]# dracut -f /boot/initramfs-6.12.0-269.el10.x86_64.img 6.12.0-269.el10.x86_64
+
+or else we can reinstall kernel version without dracut command
+
+[root@controlnode]# rpmquery kernel
+[root@controlnode]# yum reinstall kernel-6.12.0-269.el10.x86_64.rpm -y
+
+so the deleted initramfs file will get recreated again
+
+cd /boot to check the latesh initrams or dleted initrams file will be restored
+
+
+
+3rd method:
+===========
+
+using OS distrubution ios file eg: CentOS-Stream-10-latest-x86_64-dvd1.iso , ubuntu-26.04.1-desktop-amd64.iso 
+
+attach to the VMware or oracle virtualbox optical drive and powerup thevm to go to the OS scree instead of grub screen
+
+in there three option will be thhere based on OS distribution
+
+*select troubleshoot
+
+*rescue-centos
+
+it will load the screen and will show option 
+
+*select 1 to continue
+
+* type whatever shown as root mount path(rescue mount where system has been mounted under)
+
+chroot /mnt/sysimage
+
+ then type last command to regenerate initramfs file
+
+bash4.2#: dracut --regenerate-all --force -v
+
+chck whether files are created
+
+ls -lh /boot/initramfs*
+
+lsblk 
+
+then exit
+
+bash4.2#: exit
+
+and then remove optical drive from VMware and powerup the normal modeit will work normally

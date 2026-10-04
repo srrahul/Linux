@@ -1,0 +1,284 @@
+LAMPSTACK installation:
+
+L - Linux
+A - Apache
+M- Mysql
+P- PhP
+
+User Browser
+     |
+     v
+   Apache
+     |
+     v
+ PHP Application
+     |
+     v
+ MySQL Database
+
+Example: a user opens www.rahul.com/login.
+
+1. Linux is the server OS.
+2. Apache receives the HTTP/HTTPS request.
+3. PHP processes the login logic.
+4. PHP queries MySQL for the username/password information.
+5. Apache sends the generated page back to the browser.
+
+
+It is a commonly used open-source stack for hosting dynamic web applications
+
+
+Linux provides the operating system, Apache handles web requests, MySQL stores application data, and PHP handles the application logic.
+
+
+
+***********************************************************Building lamp stack in centos*******************************************************************************
+
+yum or dnf we can use for installing he package based on th OS version
+
+APACHE installation and Starting the service:
+======================================
+
+dnf clean all
+
+[root@controlnode ~]# dnf install httpd -y
+
+if it is ubuntu use apt install apache2 -y
+
+ dnf list installed httpd  (to check the version)
+
+
+rpm -qi httpd - to check the package details
+
+after installing we need to enable and start the apache server
+
+inactive status after package installed
+[root@controlnode ~]# systemctl status httpd
+○ httpd.service - The Apache HTTP Server
+     Loaded: loaded (/usr/lib/systemd/system/httpd.service; disabled; preset: d>
+     Active: inactive (dead)
+       Docs: man:httpd.service(8)
+
+enabling
+[root@controlnode ~]# systemctl enable httpd
+Created symlink '/etc/systemd/system/multi-user.target.wants/httpd.service' → '/usr/lib/systemd/system/httpd.service'.
+
+starting
+[root@controlnode ~]# systemctl start httpd
+
+
+active status now
+[root@controlnode ~]# systemctl status httpd
+● httpd.service - The Apache HTTP Server
+     Loaded: loaded (/usr/lib/systemd/system/httpd.service; enabled; preset: di>
+     Active: active (running) since Fri 2026-10-02 22:33:23 IST; 26s ago
+
+
+
+MYSQL installation and starting the service:
+=====================================
+
+for every OS the package name of mysql-server varies to check the exact mysql server package enter below
+
+dnf search mysql or dnf search mysql-server
+
+it will show all keywords related to what you typed
+
+output:
+mysql-mmm.noarch : Multi-Master Replication Manager for MySQL
+mysql-selinux.noarch : SELinux policy modules for MySQL and MariaDB packages
+mysql8.4.x86_64 : MySQL client programs and shared libraries
+mysql8.4-common.noarch : The shared files required for MySQL server and client
+mysql8.4-errmsg.noarch : The error messages files required by MySQL server
+mysql8.4-libs.x86_64 : The shared libraries required for MySQL clients
+******mysql8.4-server.x86_64 : The MySQL server and related files********
+mysqltuner.noarch : MySQL configuration assistant
+
+More files wil be there select the exact mysql8.4-server file which shows the architecture x86_64 and mention the description like  : The shared libraries required for MySQL clients
+
+
+
+now install mysql server
+
+dnf install mysql8.4-server -y
+
+after installed check by dnf info mysql8.4-server or dnf list mysql8.4-serverto view the dtails
+
+after installtion i started the service but it takes more time to start so did ctrl+c to come from that starting exit and then did
+
+journalctl -u mysqld -n 30 --no-pager
+
+to check whether it is started or not
+
+and after some time it started in the background and checked the status 
+
+[root@controlnode ~]# systemctl status mysqld
+
+and find out started 
+
+systemctl start mysqld → starts MySQL right now
+systemctl enable mysqld → configures MySQL to start automatically after reboot
+
+ systemctl status mysqld
+
+now it is active and running
+
+PHP Installation
+==============
+
+php php-mysqlnd -y contains two packages:
+- php → installs the PHP language/runtime so Apache can execute PHP files.
+- php-mysqlnd → installs the PHP driver needed for PHP to connect to MySQL.
+
+
+[root@controlnode ~]# dnf install php -y
+
+
+[root@controlnode ~]# dnf install php-mysqlnd -y
+
+
+[root@controlnode ~]# php -v
+
+[root@controlnode ~]# php -m | grep -i mysql
+mysqli
+mysqlnd
+pdo_mysql
+
+
+so sql connectivity to php is configured now restart httpd to connect the apache httpd with php
+
+[root@controlnode ~]# systemctl restart httpd
+
+[root@controlnode ~]# systemctl status httpd
+
+This line confirms it: Status: "Started, listening on: port 80" that apache listening on php
+
+
+
+Hosting  a page:
+=============
+
+/var/www/html/ is Apache’s default DocumentRoot on CentOS. In simple terms, it is the folder where Apache looks for website files.
+
+
+You can confirm Apache’s configured DocumentRoot with:
+
+grep -i DocumentRoot /etc/httpd/conf/httpd.conf
+
+so if you create any php file and want to accces that file via URL then follow below simple test:
+
+[root@controlnode /]# echo "<?php phpinfo(); ?>" > /var/www/html/info.php
+
+[root@controlnode /]# cat /var/www/html/info.php
+<?php phpinfo(); ?>
+
+
+http://192.168.0.83/info.php
+
+so after creating this url my web page is not working in my browser
+
+so what i did is check whether the we bpage is woring my linux machine by checking via curl
+
+[root@controlnode /]# curl http://localhost/info.php
+
+and it shows long html page very length that confirs that it is working locally and stronges proof line was <title>PHP 8.3.33 - phpinfo()</title> in the output
+
+after i checked the issue is related to firewall not allowed php as well port 80
+
+first check whether firewalld is runnig
+
+systemctl status firewalld
+
+ and then below
+
+[root@controlnode /]# firewall-cmd --list-services
+cockpit dhcpv6-client ssh
+
+http is missing, so port 80 is blocked by firewalld.
+
+
+[root@controlnode /]# firewall-cmd --permanent --add-service=http
+success
+
+
+[root@controlnode /]# firewall-cmd --reload
+success
+
+[root@controlnode /]# firewall-cmd --list-services
+cockpit dhcpv6-client http ssh
+
+
+after that i tried the url and now it works:
+http://192.168.0.83/info.php
+
+
+MYSQL connection:
+=================
+Next we’ll do the MySQL database side first.
+
+[root@controlnode /]# mysql -u root
+
+Because your MySQL was initialized with --initialize-insecure, root may currently have no password.
+
+
+mysql> CREATE DATABASE lftest;
+
+so after creating the DB Database/table creation was only done for testing the LAMP connection, so I am not focusing on those SQL steps.
+
+
+Created the PHP application file:
+
+vi /var/www/html/employees.php
+
+
+PHP code in employees.php:
+<?php
+$conn = new mysqli("127.0.0.1", "lampuser", "Lamp@123", "lftest");
+
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+$result = $conn->query("SELECT * FROM employees");
+
+while ($row = $result->fetch_assoc()) {
+    echo "ID: " . $row["id"] .
+         " - Name: " . $row["name"] .
+         " - Department: " . $row["department"] . "<br>";
+}
+
+$conn->close();
+?>
+
+Initially PHP was unable to connect to MySQL because SELinux blocked the connection.
+
+Enabled database connectivity for Apache/PHP:
+
+setsebool -P httpd_can_network_connect_db 1
+
+Tested locally:
+
+curl http://localhost/employees.php
+
+Then tested from the browser:
+
+http://192.168.0.83/employees.php
+
+Final flow:
+
+Browser
+  ↓
+Apache
+  ↓
+PHP
+  ↓
+MySQL
+
+
+
+
+
+
+
+
+
